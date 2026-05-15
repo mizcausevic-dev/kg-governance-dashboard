@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kinetic Gain Governance Dashboard — live audit-stream tail</title>
+    <meta
+      name="description"
+      content="Procurement-reviewer-grade dashboard for the Kinetic Gain audit-stream spine. Live SSE timeline of every governance event a deployed AI system produces, per-producer rolling counters, hash-chain verification, NIST AI RMF citations per event kind."
+    />
+    <meta name="theme-color" content="#10b981" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Kinetic Gain Governance Dashboard — live audit-stream tail"
+    />
+    <meta
+      property="og:description"
+      content="Live timeline of every governance event in a Kinetic Gain–instrumented stack, with NIST AI RMF citations per event kind."
+    />
+    <meta property="og:url" content="https://governance.kineticgain.com/" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Runtime config — edit this on the deployed site to point at your
+         audit-stream-py instance without rebuilding. Defaults to demo mode
+         when AUDIT_STREAM_URL is the placeholder. -->
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

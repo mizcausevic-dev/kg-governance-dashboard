@@ -1,0 +1,76 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: FTP-sync built dashboard to governance.kineticgain.com
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -f dist/index.html || (echo "FAIL: dist/index.html missing" && exit 1)
+          test -f dist/config.js || (echo "FAIL: dist/config.js missing (runtime config)" && exit 1)
+          grep -q "Kinetic Gain Governance" dist/index.html || \
+            (echo "FAIL: dist/index.html missing brand string" && exit 1)
+          echo "OK: build verified"
+          ls -lah dist/
+
+      - name: FTP-Deploy dist/ to /governance/ (first attempt)
+        id: deploy
+        timeout-minutes: 5
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        continue-on-error: true
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          port: 21
+          timeout: 60000
+          local-dir: ./dist/
+          server-dir: /governance/
+          dangerous-clean-slate: false
+          log-level: standard
+          exclude: |
+            **/.DS_Store
+
+      - name: Retry FTP-Deploy if first attempt failed
+        if: steps.deploy.outcome == 'failure'
+        timeout-minutes: 5
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          port: 21
+          timeout: 90000
+          local-dir: ./dist/
+          server-dir: /governance/
+          dangerous-clean-slate: false
+          log-level: verbose
+          exclude: |
+            **/.DS_Store
