@@ -12,22 +12,34 @@
 ## What it shows
 
 A procurement reviewer / CISO / district CIO opens one tab and can answer
-five questions about a deployed AI system without leaving the page:
+six questions about a deployed AI system without leaving the page:
 
 1. **Is anything happening?** — flowing live timeline of every governance
    event the stack emits, color-coded by severity, with relative timestamps
    that update in place.
-2. **Which producer is doing what?** — per-producer cards with rolling
-   counters, per-event-kind tallies, and the most recent kind for each.
-3. **Is the chain intact?** — one-click `GET /verify` that walks the
+2. **What's the trend?** — `Overview` tab shows KPI cards plus a 24-hour
+   events-per-hour stacked area chart and a top-10 event-kind distribution
+   bar chart, all derived from the same live event stream.
+3. **Which producer is doing what?** — `Producers` tab renders one large
+   card per producer in the spine, with mini bar charts per event kind +
+   last-seen highlight, color-coded by language ecosystem.
+4. **Is the chain intact?** — one-click `GET /verify` that walks the
    audit-stream chain end-to-end and reports whether anyone has tampered
-   with the log.
-4. **What compliance framework cares about this?** — every event kind
-   carries its [NIST AI RMF crosswalk](https://suite.kineticgain.com/docs/nist-rmf-crosswalk.md)
-   citation right in the timeline (MAP 2.2, MEASURE 2.5, MANAGE 1.2, etc.).
-5. **What's the story for vendor X?** — paste a domain into the vendor
-   filter and everything narrows to events whose payload mentions that
-   vendor.
+   with the log. NIST AI RMF crosswalks inline.
+5. **Wake me up when X happens.** — in-browser configurable alert rules
+   (stored in localStorage, no auth, no backend) fire either by *match*
+   (any event with kind/source matching a regex) or by *threshold*
+   (N matching events within a rolling window). Hits surface as a
+   pulsing bell badge in the header; optionally a desktop notification
+   (one-click permission grant).
+6. **What's the story for vendor X?** — paste a domain into the vendor
+   filter on the Audit Trail tab and everything narrows to events whose
+   payload mentions that vendor.
+
+Every event kind carries its [NIST AI RMF crosswalk](https://suite.kineticgain.com/docs/nist-rmf-crosswalk.md)
+citation right next to it (MAP 2.2, MEASURE 2.5, MANAGE 1.2, etc.) so a
+compliance reviewer never has to leave the page to map a governance moment
+to a framework subcategory.
 
 ## Architecture
 

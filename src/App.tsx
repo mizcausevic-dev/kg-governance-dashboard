@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ChainVerify } from "./components/ChainVerify";
+import { AnimatePresence } from "motion/react";
+import { AppHeader } from "./components/AppHeader";
+import { AuditTrailTab } from "./components/AuditTrailTab";
 import { DemoBanner } from "./components/DemoBanner";
-import { ProducerCards } from "./components/ProducerCards";
-import { Timeline } from "./components/Timeline";
-import { VendorFilter } from "./components/VendorFilter";
+import { OverviewTab } from "./components/OverviewTab";
+import { ProducersTab } from "./components/ProducersTab";
+import { Sidebar, type TabId } from "./components/Sidebar";
+import { StatusBar } from "./components/StatusBar";
+import { SystemLogStrip } from "./components/SystemLogStrip";
+import { VerifyTab } from "./components/VerifyTab";
 import {
   type ConnectionState,
   history,
@@ -13,27 +18,32 @@ import {
 import { seedHistory, startDemoStream } from "./lib/demo-events";
 import type { GovernanceEvent } from "./lib/types";
 
-/** Max events kept in memory. Older ones are evicted so the page stays snappy. */
 const MAX_EVENTS = 500;
+
+const TAB_LABEL: Record<TabId, string> = {
+  overview: "Overview",
+  producers: "Producers",
+  trail: "Audit Trail",
+  verify: "Chain Verify",
+};
 
 export default function App() {
   const [events, setEvents] = useState<readonly GovernanceEvent[]>([]);
   const [conn, setConn] = useState<ConnectionState>(isLive() ? "connecting" : "open");
+  const [tab, setTab] = useState<TabId>("overview");
   const [filter, setFilter] = useState("");
   const live = useRef(isLive()).current;
+  const connected = live ? conn === "open" : true;
 
   useEffect(() => {
     let cancelled = false;
-
     if (live) {
-      // Backfill + SSE subscribe.
       history({ limit: 50 })
         .then((seed) => {
-          if (cancelled) return;
-          setEvents(seed);
+          if (!cancelled) setEvents(seed);
         })
         .catch(() => {
-          // Empty history is fine; SSE will populate.
+          /* SSE will populate */
         });
       const sub = subscribe({
         onEvent: (ev) =>
@@ -41,14 +51,13 @@ export default function App() {
             const next = [...prev, ev];
             return next.length > MAX_EVENTS ? next.slice(next.length - MAX_EVENTS) : next;
           }),
-        onStateChange: (s) => setConn(s),
+        onStateChange: setConn,
       });
       return () => {
         cancelled = true;
         sub.close();
       };
     } else {
-      // Demo mode: synthesise history + emit a steady drip.
       const seed = seedHistory(40);
       setEvents(seed);
       const nextId = (seed[seed.length - 1]?.event_id ?? 0) + 1;
@@ -66,118 +75,37 @@ export default function App() {
   }, [live]);
 
   return (
-    <div className="app-root">
-      <Header conn={conn} live={live} count={events.length} />
+    <div className={`app-root ${live ? "live" : "demo"}`}>
+      <Sidebar
+        active={tab}
+        onSelect={setTab}
+        connected={connected}
+        eventCount={events.length}
+      />
+      <AppHeader
+        conn={conn}
+        live={live}
+        tabLabel={TAB_LABEL[tab]}
+        events={events}
+      />
       <DemoBanner />
       <main className="app-main">
-        <section className="left-rail">
-          <VendorFilter value={filter} onChange={setFilter} />
-          <ChainVerify />
-          <KeyFacts />
-        </section>
-        <section className="center-rail">
-          <h2 className="rail-h">Live timeline</h2>
-          <Timeline events={events} vendorFilter={filter} />
-        </section>
-        <section className="right-rail">
-          <h2 className="rail-h">Producers</h2>
-          <ProducerCards events={events} vendorFilter={filter} />
-        </section>
+        <AnimatePresence mode="wait">
+          {tab === "overview" && <OverviewTab key="overview" events={events} />}
+          {tab === "producers" && <ProducersTab key="producers" events={events} />}
+          {tab === "trail" && (
+            <AuditTrailTab
+              key="trail"
+              events={events}
+              filter={filter}
+              onFilter={setFilter}
+            />
+          )}
+          {tab === "verify" && <VerifyTab key="verify" />}
+        </AnimatePresence>
       </main>
-      <Footer />
+      <SystemLogStrip events={events} />
+      <StatusBar live={live} eventCount={events.length} />
     </div>
-  );
-}
-
-function Header({
-  conn,
-  live,
-  count,
-}: {
-  conn: ConnectionState;
-  live: boolean;
-  count: number;
-}) {
-  return (
-    <header className="app-header">
-      <div className="app-header-brand">
-        <span className="brand-mark" aria-hidden="true">⌬</span>
-        <div>
-          <h1>Kinetic Gain Governance Dashboard</h1>
-          <p className="app-header-tag">
-            Live audit-stream tail · per-producer counters · NIST AI RMF crosswalk · chain
-            verification
-          </p>
-        </div>
-      </div>
-      <div className="app-header-status">
-        <span className={`conn-dot conn-${conn}`} aria-hidden="true" />
-        <span className="conn-label">
-          {live ? `audit-stream-py · ${conn}` : "demo mode · synthetic stream"}
-        </span>
-        <span className="event-counter" title="events held in client memory">
-          {count.toLocaleString()} events
-        </span>
-      </div>
-    </header>
-  );
-}
-
-function KeyFacts() {
-  return (
-    <aside className="key-facts">
-      <h3>The audit-stream spine</h3>
-      <p>
-        Every governance moment in a Kinetic Gain–instrumented stack writes to one hash-chained,
-        tamper-evident log via{" "}
-        <a
-          href="https://github.com/mizcausevic-dev/audit-stream-py"
-          target="_blank"
-          rel="noreferrer"
-        >
-          audit-stream-py
-        </a>
-        . Nine producers across Python + Rust ecosystems, 21 event kinds, one verifiable narrative
-        an auditor can replay end-to-end.
-      </p>
-      <p>
-        <a
-          href="https://suite.kineticgain.com/docs/nist-rmf-crosswalk.md"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Suite × NIST AI RMF crosswalk ↗
-        </a>
-      </p>
-    </aside>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="app-footer">
-      <small>
-        © 2026 Miz Causevic ·{" "}
-        <a href="https://kineticgain.com" target="_blank" rel="noreferrer">
-          kineticgain.com
-        </a>{" "}
-        ·{" "}
-        <a
-          href="https://github.com/mizcausevic-dev/kg-governance-dashboard"
-          target="_blank"
-          rel="noreferrer"
-        >
-          source
-        </a>{" "}
-        ·{" "}
-        <a
-          href="https://github.com/mizcausevic-dev/audit-stream-py"
-          target="_blank"
-          rel="noreferrer"
-        >
-          audit-stream-py
-        </a>
-      </small>
-    </footer>
   );
 }

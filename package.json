@@ -1,8 +1,8 @@
 {
   "name": "kg-governance-dashboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Live procurement-reviewer-grade dashboard for the Kinetic Gain audit-stream spine. Tails SSE governance events, renders per-producer rolling counters, walks the hash chain, cites NIST AI RMF per event kind.",
+  "description": "Live procurement-reviewer-grade dashboard for the Kinetic Gain audit-stream spine. Dark glassmorphism UI, tabbed sidebar nav, Recharts trend + distribution, in-browser alert rules with desktop notifications, system log strip, NIST AI RMF citations per event kind.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,8 +13,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "lucide-react": "^1.16.0",
+    "motion": "^12.38.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
