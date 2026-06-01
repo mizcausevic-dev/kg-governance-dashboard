@@ -41,7 +41,7 @@ jobs:
       - name: FTP-Deploy dist/ to /governance/ (first attempt)
         id: deploy
         timeout-minutes: 5
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         continue-on-error: true
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -60,7 +60,7 @@ jobs:
       - name: Retry FTP-Deploy if first attempt failed
         if: steps.deploy.outcome == 'failure'
         timeout-minutes: 5
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
