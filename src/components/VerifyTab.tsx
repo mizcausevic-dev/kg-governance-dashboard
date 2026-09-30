@@ -23,38 +23,44 @@ export function VerifyTab() {
           event's <code>prev_hash</code> is 64 zeros.
         </p>
         <p>
-          Walking the chain end-to-end and confirming every link holds is the
-          canonical compliance answer to <em>"has anyone tampered with the
-          governance log?"</em> If a single event was edited, deleted, or
-          inserted after the fact, the very next event's <code>prev_hash</code>{" "}
-          would no longer match and the walk would fail at exactly that
-          position.
+          This catches broken links and changes that were not followed by
+          recomputing the chain. A party able to rewrite the full log can
+          recompute hashes, and a deleted tail may leave a consistent prefix.
+          Independent tamper evidence needs a separately protected checkpoint,
+          signature, or external witness plus retention controls.
         </p>
         <p>
           This dashboard's <em>Verify</em> button delegates to{" "}
           <code>GET /verify</code> on the live audit-stream server — it answers
-          for the <strong>full server-side history</strong>, not just the
-          events that happened to be in this browser's memory.
+          for the <strong>history currently held by that server</strong>, not
+          just the events in this browser's memory. The dashboard does not
+          verify the server's response independently.
         </p>
         <h4>Crosswalks</h4>
         <ul>
           <li>
-            <strong>NIST AI RMF · MAP 2.2</strong> — AI system documentation.
-            A tamper-evident log of every Decision Card drafted, every policy
-            bundle deployed, every attestation verified <em>is</em> the
-            documentation.
+            <strong>NIST AI RMF · MEASURE 2.4</strong> — Monitoring the behavior
+            of an AI system and its components in production. Some operational
+            events can prompt a reviewer to inspect this outcome.
           </li>
           <li>
-            <strong>NIST AI RMF · MEASURE 2.7</strong> — Operational measurement
-            + monitoring. Chain integrity is the evidence that monitoring is
-            real, not retrospective.
+            <strong>NIST AI RMF · MEASURE 2.7</strong> — Evaluating and documenting
+            AI system security and resilience. An attestation failure can
+            prompt further investigation.
           </li>
           <li>
-            <strong>NIST AI RMF · MANAGE 2.2</strong> — Response to detected
-            issues. If the chain ever breaks, you have a real incident on your
-            hands, not a paperwork gap.
+            <strong>NIST AI RMF · GOVERN 4.3</strong> — Practices enabling
+            testing, incident identification, and information sharing.
+            Correlation events are a review lead, not evidence of a complete process.
           </li>
         </ul>
+        <p>
+          These are review topics, not NIST conformance findings. See the{" "}
+          <a href="https://airc.nist.gov/airmf-resources/airmf/5-sec-core/" target="_blank" rel="noreferrer">
+            official NIST AI RMF Core
+          </a>{" "}
+          for the full outcomes.
+        </p>
       </article>
     </motion.div>
   );

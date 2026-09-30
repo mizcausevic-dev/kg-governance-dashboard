@@ -1,16 +1,19 @@
 name: Deploy to Hostinger
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: governance-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: FTP-sync built dashboard to governance.kineticgain.com
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -20,11 +23,23 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build
         run: npm run build
@@ -38,11 +53,9 @@ jobs:
           echo "OK: build verified"
           ls -lah dist/
 
-      - name: FTP-Deploy dist/ to /governance/ (first attempt)
-        id: deploy
+      - name: FTP-Deploy dist/ to /governance/
         timeout-minutes: 5
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        continue-on-error: true
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
@@ -54,27 +67,5 @@ jobs:
           server-dir: /governance/
           dangerous-clean-slate: false
           log-level: standard
-          exclude: |
-            **/.DS_Store
-
-      - name: Sleep before retry (let FTP cap drain)
-        if: steps.deploy.outcome == 'failure'
-        run: sleep 60
-
-      - name: Retry FTP-Deploy if first attempt failed
-        if: steps.deploy.outcome == 'failure'
-        timeout-minutes: 5
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASS }}
-          protocol: ftps
-          port: 21
-          timeout: 90000
-          local-dir: ./dist/
-          server-dir: /governance/
-          dangerous-clean-slate: false
-          log-level: verbose
           exclude: |
             **/.DS_Store

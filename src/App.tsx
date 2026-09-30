@@ -16,6 +16,7 @@ import {
   subscribe,
 } from "./lib/audit-stream";
 import { seedHistory, startDemoStream } from "./lib/demo-events";
+import { mergeEvents } from "./lib/merge-events";
 import type { GovernanceEvent } from "./lib/types";
 
 const MAX_EVENTS = 500;
@@ -33,24 +34,20 @@ export default function App() {
   const [tab, setTab] = useState<TabId>("overview");
   const [filter, setFilter] = useState("");
   const live = useRef(isLive()).current;
-  const connected = live ? conn === "open" : true;
 
   useEffect(() => {
     let cancelled = false;
     if (live) {
       history({ limit: 50 })
         .then((seed) => {
-          if (!cancelled) setEvents(seed);
+          if (!cancelled) setEvents((prev) => mergeEvents(prev, seed, MAX_EVENTS));
         })
         .catch(() => {
           /* SSE will populate */
         });
       const sub = subscribe({
         onEvent: (ev) =>
-          setEvents((prev) => {
-            const next = [...prev, ev];
-            return next.length > MAX_EVENTS ? next.slice(next.length - MAX_EVENTS) : next;
-          }),
+          setEvents((prev) => mergeEvents(prev, [ev], MAX_EVENTS)),
         onStateChange: setConn,
       });
       return () => {
@@ -76,10 +73,12 @@ export default function App() {
 
   return (
     <div className={`app-root ${live ? "live" : "demo"}`}>
+      <h1 className="sr-only">Kinetic Gain Governance Dashboard</h1>
       <Sidebar
         active={tab}
         onSelect={setTab}
-        connected={connected}
+        live={live}
+        conn={conn}
         eventCount={events.length}
       />
       <AppHeader
@@ -92,7 +91,7 @@ export default function App() {
       <main className="app-main">
         <AnimatePresence mode="wait">
           {tab === "overview" && <OverviewTab key="overview" events={events} />}
-          {tab === "producers" && <ProducersTab key="producers" events={events} />}
+          {tab === "producers" && <ProducersTab key="producers" events={events} live={live} />}
           {tab === "trail" && (
             <AuditTrailTab
               key="trail"
@@ -104,8 +103,8 @@ export default function App() {
           {tab === "verify" && <VerifyTab key="verify" />}
         </AnimatePresence>
       </main>
-      <SystemLogStrip events={events} />
-      <StatusBar live={live} eventCount={events.length} />
+      <SystemLogStrip events={events} live={live} />
+      <StatusBar live={live} conn={conn} eventCount={events.length} />
     </div>
   );
 }

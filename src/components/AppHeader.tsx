@@ -17,7 +17,7 @@ const TONE: Record<ConnectionState, string> = {
 };
 
 const LABEL: Record<ConnectionState, string> = {
-  open: "ENGINE ACTIVE",
+  open: "STREAM CONNECTED",
   connecting: "CONNECTING",
   reconnecting: "RECONNECTING",
   closed: "DISCONNECTED",
@@ -30,10 +30,10 @@ export function AppHeader({ conn, live, tabLabel, events }: Props) {
       <div className="app-header-titles">
         <h2 className="app-header-tab">{tabLabel}</h2>
         <div className="app-header-pills">
-          <span className={`pill ${live ? TONE[conn] : "tone-warn"}`}>
+          <span role="status" aria-live="polite" className={`pill ${live ? TONE[conn] : "tone-warn"}`}>
             {live ? LABEL[conn] : "DEMO MODE"}
           </span>
-          <span className="pill tone-info">ALPHA-04B</span>
+          <span className="pill tone-info">v0.2.0</span>
           <span className="pill tone-muted">{events.length} events</span>
         </div>
       </div>

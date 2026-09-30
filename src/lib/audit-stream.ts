@@ -19,16 +19,63 @@ import type { ChainVerifyResult, GovernanceEvent } from "./types";
 
 const CONFIG_PLACEHOLDER = "__AUDIT_STREAM_URL__";
 
+// audit-stream-py emits named SSE frames (`event: <kind>`) from this wire
+// vocabulary. A new upstream kind needs to be added here to appear live;
+// unnamed `message` frames are also accepted for compatible proxies.
+// https://github.com/mizcausevic-dev/audit-stream-py/blob/main/src/audit_stream/models.py
+const SSE_EVENT_KINDS = [
+  "decision_card_drafted", "decision_card_signed", "decision_card_status_changed",
+  "policy_bundle_registered", "request_denied", "request_allowed",
+  "contract_promoted", "contract_deprecated", "contract_compatibility_failed",
+  "watch_created", "watch_drifted", "watch_validity_flipped",
+  "incident_filed", "remediation_planned", "attestation_verified",
+  "attestation_tampered", "flag_swapped", "shadow_divergence_recorded",
+  "tool_invocation_allowed", "tool_invocation_denied",
+  "tool_invocation_required_approval", "other",
+] as const;
+
 export function getAuditStreamUrl(): string | null {
   const cfg = window.__KG_GOVERNANCE_CONFIG__;
   if (!cfg) return null;
   const raw = (cfg.AUDIT_STREAM_URL ?? "").trim();
   if (!raw || raw === CONFIG_PLACEHOLDER) return null;
-  return raw.replace(/\/+$/, "");
+  try {
+    const url = new URL(raw);
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+        url.username || url.password || url.search || url.hash) return null;
+    return url.href.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
 }
 
 export function isLive(): boolean {
   return getAuditStreamUrl() !== null;
+}
+
+function isGovernanceEvent(value: unknown): value is GovernanceEvent {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const event = value as Record<string, unknown>;
+  return Number.isSafeInteger(event.event_id) && Number(event.event_id) >= 0 &&
+    typeof event.timestamp === "string" && Number.isFinite(Date.parse(event.timestamp)) &&
+    typeof event.kind === "string" && typeof event.source === "string" &&
+    !!event.payload && typeof event.payload === "object" && !Array.isArray(event.payload);
+}
+
+async function getJson(url: string): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`GET failed: HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /* ---------- REST ---------------------------------------------------- */
@@ -40,15 +87,11 @@ export async function history(
   if (!base) return [];
   const limit = opts.limit ?? 50;
   const url = `${base}/events?limit=${limit}`;
-  const resp = await fetch(url, { headers: { accept: "application/json" } });
-  if (!resp.ok) {
-    throw new Error(`history GET failed: HTTP ${resp.status}`);
+  const body = await getJson(url);
+  if (!Array.isArray(body) || !body.every(isGovernanceEvent)) {
+    throw new Error("history GET: invalid governance event array");
   }
-  const body = await resp.json();
-  if (!Array.isArray(body)) {
-    throw new Error("history GET: expected JSON array");
-  }
-  return body as GovernanceEvent[];
+  return body;
 }
 
 export async function verifyChain(): Promise<ChainVerifyResult> {
@@ -56,11 +99,18 @@ export async function verifyChain(): Promise<ChainVerifyResult> {
   if (!base) {
     throw new Error("AUDIT_STREAM_URL not configured");
   }
-  const resp = await fetch(`${base}/verify`, { headers: { accept: "application/json" } });
-  if (!resp.ok) {
-    throw new Error(`verify GET failed: HTTP ${resp.status}`);
+  const body = await getJson(`${base}/verify`);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error("verify GET: invalid result");
   }
-  return (await resp.json()) as ChainVerifyResult;
+  const result = body as Record<string, unknown>;
+  if (typeof result.valid !== "boolean" ||
+      !Number.isSafeInteger(result.checked) || Number(result.checked) < 0 ||
+      !(result.first_break_at === null || (Number.isSafeInteger(result.first_break_at) && Number(result.first_break_at) >= 0)) ||
+      !(result.reason === null || typeof result.reason === "string")) {
+    throw new Error("verify GET: invalid result");
+  }
+  return result as unknown as ChainVerifyResult;
 }
 
 /* ---------- SSE ----------------------------------------------------- */
@@ -79,9 +129,8 @@ export interface SubscribeOptions {
 }
 
 /**
- * Subscribe to `/events/stream`. The browser's `EventSource` already
- * does exponential reconnect for us; we just rewrap state changes so
- * the UI can render a connection indicator.
+ * Subscribe to `/stream`. EventSource handles ordinary reconnects;
+ * the fallback timer handles a connection the browser closes permanently.
  */
 export function subscribe(opts: SubscribeOptions): Subscription {
   const base = getAuditStreamUrl();
@@ -90,9 +139,10 @@ export function subscribe(opts: SubscribeOptions): Subscription {
     opts.onError?.(new Error("AUDIT_STREAM_URL not configured"));
     return { close: () => {} };
   }
-  const url = `${base}/events/stream`;
+  const url = `${base}/stream`;
   let closed = false;
   let es: EventSource | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   function open() {
     if (closed) return;
@@ -102,17 +152,22 @@ export function subscribe(opts: SubscribeOptions): Subscription {
       if (closed) return;
       opts.onStateChange?.("open");
     };
-    es.onmessage = (msg) => {
+    const receive = (msg: Event) => {
       if (closed) return;
+      if (!(msg instanceof MessageEvent)) return;
       try {
-        const ev = JSON.parse(msg.data) as GovernanceEvent;
-        if (typeof ev.kind === "string" && typeof ev.source === "string") {
+        const ev: unknown = JSON.parse(msg.data);
+        if (isGovernanceEvent(ev)) {
           opts.onEvent(ev);
+        } else {
+          opts.onError?.(new Error("stream event: invalid governance event"));
         }
       } catch (err) {
         opts.onError?.(err);
       }
     };
+    es.onmessage = receive;
+    for (const kind of SSE_EVENT_KINDS) es.addEventListener(kind, receive);
     es.onerror = (err) => {
       if (closed) return;
       opts.onStateChange?.("reconnecting");
@@ -120,9 +175,11 @@ export function subscribe(opts: SubscribeOptions): Subscription {
       // EventSource will auto-reconnect by default; we don't need to
       // recreate it. If it transitions to CLOSED, the browser gave up
       // — we'd then need a manual restart.
-      if (es && es.readyState === EventSource.CLOSED) {
-        // Browser closed it permanently; try again after a small delay.
-        setTimeout(() => {
+      if (es && es.readyState === EventSource.CLOSED && !reconnectTimer) {
+        es.close();
+        es = null;
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
           if (!closed) open();
         }, 2_000);
       }
@@ -135,6 +192,7 @@ export function subscribe(opts: SubscribeOptions): Subscription {
     close() {
       closed = true;
       opts.onStateChange?.("closed");
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (es) {
         es.close();
         es = null;

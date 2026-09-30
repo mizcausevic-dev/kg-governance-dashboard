@@ -5,6 +5,7 @@ import type { GovernanceEvent } from "../lib/types";
 
 interface Props {
   events: readonly GovernanceEvent[];
+  live: boolean;
   /** How many lines to show. Default 8. */
   rows?: number;
 }
@@ -14,14 +15,14 @@ interface Props {
  * Shows the last N events as colored mono text — alternate compact
  * rendering of the same data the Timeline renders fully.
  */
-export function SystemLogStrip({ events, rows = 8 }: Props) {
+export function SystemLogStrip({ events, live, rows = 8 }: Props) {
   const recent = useMemo(() => events.slice(-rows).reverse(), [events, rows]);
   return (
     <div className="log-strip">
       <div className="log-strip-head">
         <Terminal className="log-strip-icon" />
         <span className="log-strip-title">SYSTEM_LOGS_STREAM</span>
-        <span className="log-strip-tag">SECURE_TUNNEL · ACTIVE</span>
+        <span className="log-strip-tag">{live ? "CONFIGURED STREAM" : "SYNTHETIC DEMO"}</span>
       </div>
       <div className="log-strip-body">
         {recent.length === 0 ? (

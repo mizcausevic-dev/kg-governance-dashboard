@@ -25,8 +25,9 @@ export function AuditTrailTab({ events, filter, onFilter }: Props) {
           <p>
             Newest at top. Severity tints the left border — <strong>emerald</strong> for healthy
             ops, <strong>amber</strong> for warnings, <strong>red</strong> for failures. Click any
-            row's <code>payload</code> caret to inspect the full body. RMF chips link each
-            governance moment to a NIST AI RMF subcategory.
+            row's <code>payload</code> caret to inspect the full body. Selected
+            events show suggested NIST AI RMF review topics; the event alone
+            does not prove an RMF outcome.
           </p>
         </div>
       </aside>

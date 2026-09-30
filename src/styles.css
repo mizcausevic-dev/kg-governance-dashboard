@@ -63,6 +63,28 @@
 * {
   box-sizing: border-box;
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--amber-300);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 html,
 body,
@@ -288,6 +310,9 @@ code {
 .heartbeat-dot-down {
   background: var(--amber-400);
   box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+.heartbeat-dot-demo {
+  background: var(--amber-400);
 }
 .heartbeat-row {
   display: flex;
@@ -1621,10 +1646,73 @@ code {
 
 @media (max-width: 800px) {
   .app-root {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto 1fr auto auto;
+  }
+  .app-header,
+  .demo-banner,
+  .app-main,
+  .log-strip,
+  .status-bar,
+  .chart-panel {
+    min-width: 0;
   }
   .sidebar {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0.75rem;
+    gap: 0.6rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-bd);
+  }
+  .sidebar-brand {
+    padding-bottom: 0.5rem;
+  }
+  .sidebar-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+  .sidebar-tab {
+    min-height: 44px;
+  }
+  .sidebar-heartbeat {
     display: none;
+  }
+  .app-header {
+    grid-row: 2;
+    padding: 0.75rem;
+  }
+  .app-header-titles,
+  .app-header-pills {
+    flex-wrap: wrap;
+  }
+  .demo-banner {
+    grid-row: 3;
+    padding: 0.75rem;
+  }
+  .demo-banner span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .app-main {
+    grid-row: 4;
+    padding: 0.75rem;
+  }
+  .kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chart-panel-head,
+  .status-bar,
+  .status-bar-left {
+    flex-wrap: wrap;
+  }
+  .log-strip {
+    grid-row: 5;
+    overflow-x: auto;
+  }
+  .status-bar {
+    grid-row: 6;
   }
   .app-header,
   .demo-banner,

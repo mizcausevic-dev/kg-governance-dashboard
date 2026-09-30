@@ -1,32 +1,35 @@
 # kg-governance-dashboard
 
-> Live procurement-reviewer-grade dashboard for the Kinetic Gain audit-stream
-> spine. Reads the same hash-chained governance log every other suite repo
-> writes to.
+> A governance-event dashboard for evaluating an audit-stream integration.
+> The public site currently runs a clearly labeled synthetic demo.
 
 [![CI](https://github.com/mizcausevic-dev/kg-governance-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/mizcausevic-dev/kg-governance-dashboard/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Live at:** [governance.kineticgain.com](https://governance.kineticgain.com)
+**Public demo:** [governance.kineticgain.com](https://governance.kineticgain.com).
+Its `/config.js` still had the `__AUDIT_STREAM_URL__` placeholder when checked
+on 2026-09-29; no production audit-stream feed was verified.
 
 ## What it shows
 
-A procurement reviewer / CISO / district CIO opens one tab and can answer
-six questions about a deployed AI system without leaving the page:
+A reviewer can explore these questions in the synthetic demo. With an
+approved stream configured, the same interface can display that stream's
+events; completeness and provenance must be assessed separately:
 
-1. **Is anything happening?** — flowing live timeline of every governance
-   event the stack emits, color-coded by severity, with relative timestamps
+1. **Is anything happening?** — timeline of received governance events,
+   color-coded by severity, with relative timestamps
    that update in place.
 2. **What's the trend?** — `Overview` tab shows KPI cards plus a 24-hour
    events-per-hour stacked area chart and a top-10 event-kind distribution
-   bar chart, all derived from the same live event stream.
+   bar chart, all derived from the currently displayed event stream.
 3. **Which producer is doing what?** — `Producers` tab renders one large
    card per producer in the spine, with mini bar charts per event kind +
    last-seen highlight, color-coded by language ecosystem.
-4. **Is the chain intact?** — one-click `GET /verify` that walks the
-   audit-stream chain end-to-end and reports whether anyone has tampered
-   with the log. NIST AI RMF crosswalks inline.
-5. **Wake me up when X happens.** — in-browser configurable alert rules
+4. **Is the stored chain internally consistent?** — one-click `GET /verify`
+   asks the configured server to check its current log. This does not prove
+   completeness or protect against a privileged rewrite without an external
+   checkpoint or witness. NIST AI RMF mapping aids appear inline.
+5. **Signal while this tab is open.** — in-browser configurable alert rules
    (stored in localStorage, no auth, no backend) fire either by *match*
    (any event with kind/source matching a regex) or by *threshold*
    (N matching events within a rolling window). Hits surface as a
@@ -36,10 +39,10 @@ six questions about a deployed AI system without leaving the page:
    filter on the Audit Trail tab and everything narrows to events whose
    payload mentions that vendor.
 
-Every event kind carries its [NIST AI RMF crosswalk](https://suite.kineticgain.com/docs/nist-rmf-crosswalk.md)
-citation right next to it (MAP 2.2, MEASURE 2.5, MANAGE 1.2, etc.) so a
-compliance reviewer never has to leave the page to map a governance moment
-to a framework subcategory.
+Selected event kinds have suggested review topics linked to the
+[official NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/).
+Uncertain kinds are deliberately unmapped. These are prompts for review, not
+conformance findings or proof that a control operates.
 
 ## Architecture
 
@@ -49,13 +52,21 @@ audit-stream-py     --SSE-->     kg-governance-dashboard
                                    (deployed as static HTML/JS to a CDN)
 ```
 
-Pure SPA. Zero backend. Three runtime data sources:
+Pure SPA with no dashboard backend. When configured, it uses three runtime
+read surfaces from the selected audit-stream instance:
 
 - `GET {AUDIT_STREAM_URL}/events?limit=50` — initial backfill on cold load.
-- `GET {AUDIT_STREAM_URL}/events/stream` — long-lived SSE for the live tail.
-  Browser auto-reconnects on drop; the UI shows the connection state.
+- `GET {AUDIT_STREAM_URL}/stream` — long-lived SSE for the live tail.
+Browser reconnects on drop; the UI shows the connection state.
 - `GET {AUDIT_STREAM_URL}/verify` — on demand, when the user clicks the
   "Verify the chain" button.
+
+`audit-stream-py` sends named SSE events (`event: <kind>`). The client listens
+for the server's current event-kind vocabulary as well as unnamed messages;
+an upstream kind addition needs a client update before it appears in the live
+tail. Some synthetic demo kinds are not accepted by the current upstream
+server. See its [wire model](https://github.com/mizcausevic-dev/audit-stream-py/blob/main/src/audit_stream/models.py)
+and [SSE endpoint](https://github.com/mizcausevic-dev/audit-stream-py/blob/main/src/audit_stream/app.py).
 
 When `AUDIT_STREAM_URL` is unset the dashboard runs against a built-in
 **demo stream** that synthesises realistic events at ~1.5/sec across all
@@ -76,18 +87,30 @@ window.__KG_GOVERNANCE_CONFIG__ = {
 ```
 
 Leave `AUDIT_STREAM_URL` as the placeholder `__AUDIT_STREAM_URL__` to
-stay in demo mode.
+stay in demo mode. The URL must use HTTPS; plain HTTP is accepted only for
+loopback development. Userinfo, query parameters, and fragments are rejected.
+Invalid values also fall back to demo mode, so check the on-page mode label
+after changing the config.
 
 CORS: your `audit-stream-py` instance must allow the dashboard's
-origin. The relevant CORS headers for `/events`, `/events/stream`, and
-`/verify` are `Access-Control-Allow-Origin: https://governance.kineticgain.com`
-(or `*` for the demo).
+origin. A live public dashboard must receive only events and payload fields
+approved for public disclosure. Do not point this public SPA at an internal,
+privileged, or client-data stream: browser users can inspect every response
+and expanded payload. CORS is not authorization. Define backend authentication,
+redaction, retention, and an independent chain checkpoint before calling a
+connected deployment procurement-ready. Alert rules and up to 100 recent hit
+summaries are stored in each browser's `localStorage`; users can clear hits in
+the Signals drawer. No analytics are configured in this repo, and fonts are
+served locally.
 
 ## Producers in scope
 
-Nine producers across two language ecosystems, 21 event kinds total.
-Every one of these emits to the same `audit-stream-py` endpoint with
-the same `{kind, source, payload}` envelope:
+The synthetic demo has a catalog of nine producer names and 21 event kinds.
+In connected mode, the Producers tab lists only source names and kinds observed
+in received events; those names are not authenticated producer identities.
+Catalog membership is not proof that a producer is currently deployed or
+emitting. A compatible stream uses the
+`{kind, source, payload}` envelope:
 
 | Producer | Lang | Event kinds |
 |---|---|---|
@@ -117,13 +140,15 @@ npm run preview   # serve the production build locally
 
 The repo ships with two GitHub Actions workflows:
 
-- `.github/workflows/ci.yml` — runs lint + typecheck + test + build on
-  every push, matrix on Node 20 + 22.
-- `.github/workflows/deploy.yml` — builds + FTPs `dist/` to `/governance/`
-  on every push to `main`. Configure repo secrets `FTP_HOST`, `FTP_USER`,
-  `FTP_PASS`.
-
-Same pattern as the other `*.kineticgain.com` properties.
+- `.github/workflows/ci.yml` — runs lint, typecheck, tests, build, and
+  dependency audit on every push/PR, matrix on Node 22 + 24.
+- `.github/workflows/deploy.yml` — manual dispatch from `main` only. It runs
+  lint, typecheck, tests, a production dependency audit, and a build before
+  attempting FTPS-sync of `dist/` to `/governance/`. Configure repo secrets
+  `FTP_HOST`, `FTP_USER`, `FTP_PASS`, verify account access and path, and check
+  the actual workflow and public site after any release. The observed main
+  deploy run on 2026-08-05 failed with `530 Login incorrect` on both attempts;
+  a passing local build does not establish deployment.
 
 ## Composes with
 

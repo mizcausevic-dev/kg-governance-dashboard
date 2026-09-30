@@ -2,7 +2,7 @@
   "name": "kg-governance-dashboard",
   "version": "0.2.0",
   "private": true,
-  "description": "Live procurement-reviewer-grade dashboard for the Kinetic Gain audit-stream spine. Dark glassmorphism UI, tabbed sidebar nav, Recharts trend + distribution, in-browser alert rules with desktop notifications, system log strip, NIST AI RMF citations per event kind.",
+  "description": "Synthetic governance-event demo by default, with an optional approved audit-stream connection, local alerts, trend charts, and selected NIST AI RMF review topics.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,14 +23,14 @@
     "@eslint/js": "^9.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.0.0",
-    "happy-dom": "^15.0.0",
+    "happy-dom": "^20.14.5",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.0.0",
-    "vite": "^5.4.0",
-    "vitest": "^2.0.0"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
   }
 }
