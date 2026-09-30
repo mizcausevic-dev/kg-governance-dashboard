@@ -11,11 +11,12 @@ import { SystemLogStrip } from "./components/SystemLogStrip";
 import { VerifyTab } from "./components/VerifyTab";
 import {
   type ConnectionState,
+  getAuditStreamMode,
   history,
-  isLive,
   subscribe,
 } from "./lib/audit-stream";
 import { seedHistory, startDemoStream } from "./lib/demo-events";
+import { mergeEvents } from "./lib/merge-events";
 import type { GovernanceEvent } from "./lib/types";
 
 const MAX_EVENTS = 500;
@@ -29,35 +30,37 @@ const TAB_LABEL: Record<TabId, string> = {
 
 export default function App() {
   const [events, setEvents] = useState<readonly GovernanceEvent[]>([]);
-  const [conn, setConn] = useState<ConnectionState>(isLive() ? "connecting" : "open");
+  const mode = useRef(getAuditStreamMode()).current;
+  const [conn, setConn] = useState<ConnectionState>(mode === "live" ? "connecting" : "closed");
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>("overview");
   const [filter, setFilter] = useState("");
-  const live = useRef(isLive()).current;
-  const connected = live ? conn === "open" : true;
+  const live = mode === "live";
 
   useEffect(() => {
     let cancelled = false;
     if (live) {
       history({ limit: 50 })
         .then((seed) => {
-          if (!cancelled) setEvents(seed);
+          if (!cancelled) setEvents((prev) => mergeEvents(prev, seed, MAX_EVENTS));
         })
-        .catch(() => {
-          /* SSE will populate */
+        .catch((error: unknown) => {
+          if (!cancelled) setStreamError(error instanceof Error ? error.message : "Unable to load stream history");
         });
       const sub = subscribe({
         onEvent: (ev) =>
-          setEvents((prev) => {
-            const next = [...prev, ev];
-            return next.length > MAX_EVENTS ? next.slice(next.length - MAX_EVENTS) : next;
-          }),
-        onStateChange: setConn,
+          setEvents((prev) => mergeEvents(prev, [ev], MAX_EVENTS)),
+        onStateChange: (state) => {
+          setConn(state);
+          if (state === "open") setStreamError(null);
+        },
+        onError: () => setStreamError((current) => current ?? "Stream connection failed; check gateway access"),
       });
       return () => {
         cancelled = true;
         sub.close();
       };
-    } else {
+    } else if (mode === "demo") {
       const seed = seedHistory(40);
       setEvents(seed);
       const nextId = (seed[seed.length - 1]?.event_id ?? 0) + 1;
@@ -72,27 +75,34 @@ export default function App() {
         sub.close();
       };
     }
-  }, [live]);
+  }, [live, mode]);
 
   return (
-    <div className={`app-root ${live ? "live" : "demo"}`}>
+    <div className={`app-root ${mode}`}>
+      <h1 className="sr-only">Kinetic Gain Governance Dashboard</h1>
       <Sidebar
         active={tab}
         onSelect={setTab}
-        connected={connected}
+        mode={mode}
+        conn={conn}
         eventCount={events.length}
       />
       <AppHeader
         conn={conn}
-        live={live}
+        mode={mode}
         tabLabel={TAB_LABEL[tab]}
         events={events}
       />
-      <DemoBanner />
+      <DemoBanner mode={mode} />
+      {mode === "live" && streamError && (
+        <div className="demo-banner stream-error-banner" role="alert">
+          <strong>Live stream unavailable.</strong> {streamError}. Check the gateway route, session, and read permissions.
+        </div>
+      )}
       <main className="app-main">
         <AnimatePresence mode="wait">
           {tab === "overview" && <OverviewTab key="overview" events={events} />}
-          {tab === "producers" && <ProducersTab key="producers" events={events} />}
+          {tab === "producers" && <ProducersTab key="producers" events={events} mode={mode} />}
           {tab === "trail" && (
             <AuditTrailTab
               key="trail"
@@ -104,8 +114,8 @@ export default function App() {
           {tab === "verify" && <VerifyTab key="verify" />}
         </AnimatePresence>
       </main>
-      <SystemLogStrip events={events} />
-      <StatusBar live={live} eventCount={events.length} />
+      <SystemLogStrip events={events} mode={mode} />
+      <StatusBar mode={mode} conn={conn} eventCount={events.length} />
     </div>
   );
 }

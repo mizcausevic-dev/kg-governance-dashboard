@@ -1,248 +1,173 @@
 /**
- * NIST AI RMF crosswalk per event kind.
- *
- * The full Suite × NIST AI RMF crosswalk lives at
- * https://suite.kineticgain.com/docs/nist-rmf-crosswalk.md and maps the
- * 11 specs + the implementation tooling to specific subcategories.
- * This file is the *runtime* slice — for every event kind a Kinetic
- * Gain producer can emit, which RMF subcategory does that event
- * directly contribute evidence for?
- *
- * Use this to render "what compliance framework cares about this?"
- * next to each event in the timeline, so a procurement reviewer can
- * see governance ↔ RMF mapping at a glance.
+ * Suggested NIST AI RMF review topics for a few event kinds. This is a
+ * deliberately narrow map: an event is not proof that an RMF outcome was met.
+ * Topic descriptions were checked against the official AI RMF 1.0 Core on
+ * 2026-09-29. Keep uncertain event kinds unmapped until reviewed.
  */
+export const NIST_CORE_URL = "https://airc.nist.gov/airmf-resources/airmf/5-sec-core/";
 
 export interface RmfCitation {
-  /** Subcategory id, e.g. "MEASURE 2.5". */
   id: string;
-  /** Short human-readable description. */
   short: string;
 }
 
-/**
- * Severity hint for timeline accents. Operators care about *_failed,
- * *_denied, *_drifted; routine emissions are info.
- */
 export type EventSeverity = "ok" | "info" | "warn" | "error";
 
 export interface EventCatalogEntry {
   kind: string;
-  /** One-line description shown in tooltips + the timeline. */
   blurb: string;
   severity: EventSeverity;
+  /** Review topics, not evidence of implementation or conformance. */
   rmf: readonly RmfCitation[];
 }
 
-/* prettier-ignore */
+const MONITORING: RmfCitation = {
+  id: "MEASURE 2.4",
+  short: "Production AI system behavior monitoring",
+};
+const INCIDENT_PRACTICES: RmfCitation = {
+  id: "GOVERN 4.3",
+  short: "Practices for testing and incident identification",
+};
+const SECURITY_RESILIENCE: RmfCitation = {
+  id: "MEASURE 2.7",
+  short: "Security and resilience evaluation",
+};
+
 export const EVENT_CATALOG: Record<string, EventCatalogEntry> = {
-  // procurement-decision-api
   decision_card_drafted: {
     kind: "decision_card_drafted",
     blurb: "A buyer drafted a Decision Card from a vendor's Suite documents.",
     severity: "info",
-    rmf: [
-      { id: "GOVERN 5.1", short: "Organizational policies + procedures" },
-      { id: "MAP 3.1",     short: "AI risks + benefits cataloged" },
-    ],
+    rmf: [],
   },
-
-  // aeo-validator-service
   watch_created: {
     kind: "watch_created",
-    blurb: "A new always-on validation watch was installed for a Suite doc URL.",
+    blurb: "A document validation watch was created.",
     severity: "info",
-    rmf: [
-      { id: "MEASURE 2.7", short: "Operational measurement + monitoring" },
-    ],
+    rmf: [],
   },
   watch_drifted: {
     kind: "watch_drifted",
-    blurb: "A watched Suite doc changed shape since the last poll.",
+    blurb: "A watched document changed since the last poll.",
     severity: "warn",
-    rmf: [
-      { id: "MEASURE 2.7",  short: "Operational measurement + monitoring" },
-      { id: "MEASURE 2.10", short: "Deviation from expected behavior tracked" },
-    ],
+    rmf: [],
   },
   watch_validity_flipped: {
     kind: "watch_validity_flipped",
-    blurb: "A watched Suite doc went from valid → invalid (or back).",
+    blurb: "A watched document changed validity state.",
     severity: "error",
-    rmf: [
-      { id: "MEASURE 2.7", short: "Operational measurement + monitoring" },
-      { id: "MANAGE 2.2",  short: "Response to detected issues" },
-    ],
+    rmf: [],
   },
-
-  // policy-as-code-engine
   policy_bundle_registered: {
     kind: "policy_bundle_registered",
-    blurb: "A runtime policy bundle was deployed (often from a Decision Card).",
+    blurb: "A runtime policy bundle was registered.",
     severity: "ok",
-    rmf: [
-      { id: "GOVERN 5.1", short: "Organizational policies + procedures" },
-    ],
+    rmf: [],
   },
   request_allowed: {
     kind: "request_allowed",
-    blurb: "A live request was evaluated and allowed by a policy bundle.",
+    blurb: "A request was evaluated and allowed by a policy bundle.",
     severity: "info",
-    rmf: [
-      { id: "MEASURE 2.5", short: "AI system operational measurement" },
-    ],
+    rmf: [MONITORING],
   },
   request_denied: {
     kind: "request_denied",
-    blurb: "A live request was evaluated and DENIED by a policy bundle.",
+    blurb: "A request was evaluated and denied by a policy bundle.",
     severity: "warn",
-    rmf: [
-      { id: "MEASURE 2.5", short: "AI system operational measurement" },
-      { id: "MANAGE 1.2",  short: "Risk response resourcing" },
-    ],
+    rmf: [MONITORING],
   },
-
-  // data-contract-registry
   contract_promoted: {
     kind: "contract_promoted",
-    blurb: "A new data-contract version passed compatibility checks and was promoted.",
+    blurb: "A data-contract version passed compatibility checks and was promoted.",
     severity: "ok",
-    rmf: [
-      { id: "GOVERN 4.1", short: "Org commits to AI lifecycle decisions" },
-    ],
+    rmf: [],
   },
   contract_deprecated: {
     kind: "contract_deprecated",
     blurb: "A data-contract version was marked deprecated.",
     severity: "info",
-    rmf: [
-      { id: "MANAGE 4.1", short: "Continuous improvement of risk responses" },
-    ],
+    rmf: [],
   },
   contract_compatibility_failed: {
     kind: "contract_compatibility_failed",
-    blurb: "A proposed data-contract version was REJECTED for breaking compatibility.",
+    blurb: "A proposed data-contract version failed compatibility checks.",
     severity: "error",
-    rmf: [
-      { id: "MANAGE 4.1", short: "Continuous improvement of risk responses" },
-      { id: "MEASURE 2.7", short: "Operational measurement + monitoring" },
-    ],
+    rmf: [],
   },
-
-  // slo-budget-tracker
   slo_burn_started: {
     kind: "slo_burn_started",
     blurb: "An SLO burn-rate window crossed the alert threshold.",
     severity: "warn",
-    rmf: [
-      { id: "MANAGE 1.2", short: "Risk response resourcing" },
-      { id: "MEASURE 2.8", short: "Operational transparency" },
-    ],
+    rmf: [MONITORING],
   },
   slo_recovered: {
     kind: "slo_recovered",
     blurb: "An SLO burn-rate window cleared.",
     severity: "ok",
-    rmf: [
-      { id: "MEASURE 2.8", short: "Operational transparency" },
-    ],
+    rmf: [MONITORING],
   },
-
-  // hash-attestation
   attestation_signed: {
     kind: "attestation_signed",
-    blurb: "An ed25519 attestation was minted over a Suite doc canonical hash.",
+    blurb: "An attestation was signed over a canonical document hash.",
     severity: "info",
-    rmf: [
-      { id: "MAP 2.2",     short: "AI system documentation" },
-      { id: "MEASURE 2.8", short: "Operational transparency" },
-    ],
+    rmf: [],
   },
   attestation_verified: {
     kind: "attestation_verified",
-    blurb: "An attestation was verified against a trusted key — bytes are authentic.",
+    blurb: "An attestation signature was reported as verified.",
     severity: "ok",
-    rmf: [
-      { id: "MAP 2.2",     short: "AI system documentation" },
-      { id: "MEASURE 2.7", short: "Operational measurement + monitoring" },
-    ],
+    rmf: [],
   },
   attestation_failed: {
     kind: "attestation_failed",
-    blurb: "Attestation verification FAILED — tampered doc, untrusted key, or bad signature.",
+    blurb: "An attestation verification failed; investigate the cause.",
     severity: "error",
-    rmf: [
-      { id: "MAP 2.2",    short: "AI system documentation" },
-      { id: "MANAGE 2.2", short: "Response to detected issues" },
-    ],
+    rmf: [SECURITY_RESILIENCE],
   },
-
-  // incident-correlation
   incident_correlated: {
     kind: "incident_correlated",
-    blurb: "An AI Incident Card was walked across the suite graph to a remediation plan.",
+    blurb: "An incident was correlated with related records.",
     severity: "info",
-    rmf: [
-      { id: "GOVERN 5.1", short: "Organizational policies + procedures" },
-      { id: "MANAGE 4.2", short: "AI risk management process improvement" },
-    ],
+    rmf: [INCIDENT_PRACTICES],
   },
   incident_correlation_failed: {
     kind: "incident_correlation_failed",
-    blurb: "Incident correlation failed (unknown affected doc or graph error).",
+    blurb: "Incident correlation failed; review the source record or graph.",
     severity: "error",
-    rmf: [
-      { id: "MANAGE 4.2", short: "AI risk management process improvement" },
-    ],
+    rmf: [INCIDENT_PRACTICES],
   },
-
-  // aeo-graph-explorer
   graph_ingested: {
     kind: "graph_ingested",
-    blurb: "An AEO graph crawl was atomically swapped into the explorer.",
+    blurb: "A graph crawl was ingested into the explorer.",
     severity: "ok",
-    rmf: [
-      { id: "MAP 4.1", short: "Map AI system to organizational context" },
-    ],
+    rmf: [],
   },
   graph_ingest_failed: {
     kind: "graph_ingest_failed",
-    blurb: "An AEO graph crawl was rejected — malformed JSONL.",
+    blurb: "A graph crawl failed ingestion checks.",
     severity: "error",
-    rmf: [
-      { id: "MAP 4.1",      short: "Map AI system to organizational context" },
-      { id: "MEASURE 2.10", short: "Deviation from expected behavior tracked" },
-    ],
+    rmf: [],
   },
-
-  // reliability-toolkit
   breaker_opened: {
     kind: "breaker_opened",
-    blurb: "A circuit breaker tripped — downstream lost our trust.",
+    blurb: "A circuit breaker opened after a downstream failure.",
     severity: "error",
-    rmf: [
-      { id: "MANAGE 1.2",  short: "Risk response resourcing" },
-      { id: "MEASURE 2.5", short: "AI system operational measurement" },
-    ],
+    rmf: [MONITORING],
   },
   breaker_recovered: {
     kind: "breaker_recovered",
-    blurb: "A circuit breaker recovered — downstream looks healthy again.",
+    blurb: "A circuit breaker recovered.",
     severity: "ok",
-    rmf: [
-      { id: "MEASURE 2.8", short: "Operational transparency" },
-    ],
+    rmf: [MONITORING],
   },
-} as const;
+};
 
-/** Lookup an event kind. Falls back to a generic info entry when unknown. */
 export function lookup(kind: string): EventCatalogEntry {
-  return (
-    EVENT_CATALOG[kind] ?? {
-      kind,
-      blurb: "Unknown event kind. (Producer not in the v0.1.0 catalogue — payload still chained.)",
-      severity: "info",
-      rmf: [],
-    }
-  );
+  return EVENT_CATALOG[kind] ?? {
+    kind,
+    blurb: "Uncatalogued event kind. Review the producer and payload before using it as evidence.",
+    severity: "info",
+    rmf: [],
+  };
 }

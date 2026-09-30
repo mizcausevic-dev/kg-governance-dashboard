@@ -6,6 +6,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import type { ConnectionState, StreamMode } from "../lib/audit-stream";
 
 export type TabId = "overview" | "producers" | "trail" | "verify";
 
@@ -26,7 +27,8 @@ interface Props {
   active: TabId;
   onSelect: (tab: TabId) => void;
   /** Whether the live SSE connection is healthy — drives the heartbeat dot. */
-  connected: boolean;
+  mode: StreamMode;
+  conn: ConnectionState;
   /** Total events held in memory — shown in the heartbeat panel. */
   eventCount: number;
 }
@@ -36,7 +38,9 @@ interface Props {
  * switcher + a heartbeat panel pinned to the bottom showing whether
  * the dashboard is talking to a live audit-stream.
  */
-export function Sidebar({ active, onSelect, connected, eventCount }: Props) {
+export function Sidebar({ active, onSelect, mode, conn, eventCount }: Props) {
+  const live = mode === "live";
+  const connected = live && conn === "open";
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -57,6 +61,7 @@ export function Sidebar({ active, onSelect, connected, eventCount }: Props) {
               type="button"
               className={`sidebar-tab ${isActive ? "sidebar-tab-active" : ""}`}
               onClick={() => onSelect(tab.id)}
+              aria-current={isActive ? "page" : undefined}
             >
               <Icon className="sidebar-tab-icon" />
               <span className="sidebar-tab-label">{tab.label}</span>
@@ -70,14 +75,14 @@ export function Sidebar({ active, onSelect, connected, eventCount }: Props) {
         <div className="heartbeat-head">
           <span className="heartbeat-label">Heartbeat</span>
           <span
-            className={`heartbeat-dot ${connected ? "heartbeat-dot-up" : "heartbeat-dot-down"}`}
+            className={`heartbeat-dot ${mode === "demo" ? "heartbeat-dot-demo" : connected ? "heartbeat-dot-up" : "heartbeat-dot-down"}`}
             aria-hidden="true"
           />
         </div>
         <div className="heartbeat-row">
           <span>state</span>
           <span className="heartbeat-val">
-            {connected ? "live" : "demo"}
+            {mode === "invalid" ? "config error" : !live ? "demo" : connected ? "live" : conn}
           </span>
         </div>
         <div className="heartbeat-row">

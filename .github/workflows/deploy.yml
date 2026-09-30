@@ -1,30 +1,47 @@
-name: Deploy to Hostinger
+name: Deploy synthetic demo to Hostinger
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: governance-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: FTP-sync built dashboard to governance.kineticgain.com
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build
         run: npm run build
@@ -38,11 +55,18 @@ jobs:
           echo "OK: build verified"
           ls -lah dist/
 
-      - name: FTP-Deploy dist/ to /governance/ (first attempt)
-        id: deploy
+      - name: Refuse to overwrite a connected site
+        run: |
+          node scripts/check-demo-config.mjs dist/config.js
+          curl --fail --show-error --silent --max-time 15 \
+            -H 'Cache-Control: no-cache' \
+            "https://governance.kineticgain.com/config.js?preflight=${GITHUB_RUN_ID}" \
+            -o "$RUNNER_TEMP/governance-live-config.js"
+          node scripts/check-demo-config.mjs "$RUNNER_TEMP/governance-live-config.js"
+
+      - name: FTP-Deploy dist/ to /governance/
         timeout-minutes: 5
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@8e83cea8672e3fbcbb9fdafff34debf6ae4c5f65 # v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
@@ -54,27 +78,5 @@ jobs:
           server-dir: /governance/
           dangerous-clean-slate: false
           log-level: standard
-          exclude: |
-            **/.DS_Store
-
-      - name: Sleep before retry (let FTP cap drain)
-        if: steps.deploy.outcome == 'failure'
-        run: sleep 60
-
-      - name: Retry FTP-Deploy if first attempt failed
-        if: steps.deploy.outcome == 'failure'
-        timeout-minutes: 5
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASS }}
-          protocol: ftps
-          port: 21
-          timeout: 90000
-          local-dir: ./dist/
-          server-dir: /governance/
-          dangerous-clean-slate: false
-          log-level: verbose
           exclude: |
             **/.DS_Store

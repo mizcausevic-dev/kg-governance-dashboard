@@ -36,6 +36,38 @@ export function NotificationBell({ events }: Props) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"hits" | "rules">("hits");
   const [permission, setPermission] = useState(notificationPermission());
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const drawer = drawerRef.current;
+    const trigger = triggerRef.current;
+    drawer?.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+      }
+      if (event.key !== "Tab" || !drawer) return;
+      const controls = [...drawer.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)")];
+      if (controls.length === 0) return;
+      const first = controls[0]!;
+      const last = controls[controls.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      trigger?.focus();
+    };
+  }, [open]);
 
   // Evaluate rules against each new event.
   const lastSeenIdRef = useRef<number>(0);
@@ -93,9 +125,12 @@ export function NotificationBell({ events }: Props) {
   return (
     <div className="bell-container">
       <button
+        ref={triggerRef}
         type="button"
         className={`bell-button ${unread > 0 ? "bell-button-armed" : ""}`}
         aria-label={`Notifications (${unread} unread)`}
+        aria-expanded={open}
+        aria-controls="signals-dialog"
         onClick={() => {
           setOpen(true);
           setView("hits");
@@ -110,12 +145,18 @@ export function NotificationBell({ events }: Props) {
           <>
             <motion.div
               className="bell-overlay"
+              aria-hidden="true"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setOpen(false)}
             />
             <motion.aside
+              id="signals-dialog"
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Signals"
               className="bell-drawer glass-card"
               initial={{ x: 400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}

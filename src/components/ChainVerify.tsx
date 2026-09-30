@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isLive, verifyChain } from "../lib/audit-stream";
+import { getAuditStreamMode, verifyChain } from "../lib/audit-stream";
 import type { ChainVerifyResult } from "../lib/types";
 
 type State =
@@ -11,13 +11,14 @@ type State =
 /**
  * Single "verify the chain" button that calls `GET /verify` on the
  * live audit-stream server and reports the result inline. The
- * canonical compliance answer — much stronger than client-side
- * verification because it covers the FULL server-side history.
+ * Checks internal consistency of the server's current chain. This is not
+ * independent proof against a privileged rewrite or deleted tail.
  *
  * In demo mode the button is disabled with an explainer.
  */
 export function ChainVerify() {
-  const live = isLive();
+  const mode = getAuditStreamMode();
+  const live = mode === "live";
   const [state, setState] = useState<State>({ kind: "idle" });
 
   async function run() {
@@ -39,9 +40,9 @@ export function ChainVerify() {
         <div>
           <h3>Verify the chain</h3>
           <p>
-            Walks the audit-stream-py hash chain end-to-end and confirms every event's{" "}
-            <code>prev_hash</code> + canonical-hash link is intact. The compliance answer to{" "}
-            <em>"has anyone tampered with the governance log?"</em>
+            Asks the configured server to check its current hash chain for
+            broken links or altered stored event hashes. A valid result does not
+            prove the server history is complete or independently authentic.
           </p>
         </div>
         <button
@@ -56,8 +57,9 @@ export function ChainVerify() {
 
       {!live && (
         <div className="chain-verify-demo">
-          Disabled in demo mode. Configure <code>AUDIT_STREAM_URL</code> in{" "}
-          <code>/config.js</code> to point this dashboard at your audit-stream-py instance.
+          {mode === "invalid" ? "Disabled: the configured stream URL is invalid." :
+            <>Disabled in demo mode. Configure <code>AUDIT_STREAM_URL</code> in{" "}
+            <code>/config.js</code> to use an authenticated same-origin gateway.</>}
         </div>
       )}
 
@@ -69,11 +71,11 @@ export function ChainVerify() {
 
 function ChainVerifyResultBlock({ result }: { result: ChainVerifyResult }) {
   return (
-    <div className={`chain-verify-result ${result.valid ? "ok" : "broken"}`}>
+    <div role="status" className={`chain-verify-result ${result.valid ? "ok" : "broken"}`}>
       <div className="chain-verify-headline">
         {result.valid ? (
           <>
-            <strong>✓ chain valid</strong> — {result.checked.toLocaleString()} events checked
+            <strong>✓ stored chain internally consistent</strong> — {result.checked.toLocaleString()} events checked
           </>
         ) : (
           <>

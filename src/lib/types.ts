@@ -13,9 +13,9 @@
  *     "hash":       "b7d1..."
  *   }
  *
- * Live SSE events arrive WITHOUT `prev_hash` / `hash` set (the server
- * already chained them — clients just observe). REST history responses
- * include them.
+ * The current audit-stream-py server includes `prev_hash` and `hash` in
+ * both SSE and REST events. This client displays those fields but does not
+ * independently recompute or authenticate them.
  */
 export interface GovernanceEvent {
   event_id: number;
@@ -50,7 +50,7 @@ declare global {
 export interface Producer {
   source: string;
   display: string;
-  language: "Python" | "Rust";
+  language: "Python" | "Rust" | "Unverified";
   shape: string;
   kinds: readonly string[];
 }

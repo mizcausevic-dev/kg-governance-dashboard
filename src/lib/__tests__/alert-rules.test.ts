@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_RULES, evaluate } from "../alert-rules";
+import { DEFAULT_RULES, evaluate, loadRules } from "../alert-rules";
 import type { GovernanceEvent } from "../types";
 
 function ev(
@@ -74,9 +74,21 @@ describe("evaluate", () => {
     expect(evaluate(rule, [e], e)).toBeNull();
   });
 
-  it("attestation_failed matches the dedicated tamper rule", () => {
+  it("real upstream attestation_tampered matches the dedicated rule", () => {
     const rule = DEFAULT_RULES.find((r) => r.id === "rule-attestation-tamper")!;
-    const e = ev(1, "attestation_failed", "hash-attestation");
+    const e = ev(1, "attestation_tampered", "hash-attestation-rs");
     expect(evaluate(rule, [e], e)).not.toBeNull();
+  });
+
+  it("upgrades only the untouched old attestation rule in saved settings", () => {
+    const old = { ...DEFAULT_RULES[1]!,
+      label: "Attestation verification failure (possible tampering)",
+      kinds: ["^attestation_failed$"] };
+    const custom = { ...old, id: "custom-attestation", label: "My rule" };
+    localStorage.setItem("kg-governance-dashboard:alert-rules:v1", JSON.stringify([old, custom]));
+    const loaded = loadRules();
+    expect(loaded[0]?.kinds).toEqual(["^attestation_(?:failed|tampered)$"]);
+    expect(loaded[1]).toEqual(custom);
+    localStorage.removeItem("kg-governance-dashboard:alert-rules:v1");
   });
 });

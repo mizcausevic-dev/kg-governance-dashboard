@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { lookup } from "../lib/rmf-citations";
+import { lookup, NIST_CORE_URL } from "../lib/rmf-citations";
 import type { GovernanceEvent } from "../lib/types";
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
  *   - kind badge with severity color
  *   - source pill
  *   - one-line blurb from the catalogue
- *   - NIST RMF citations
+ *   - optional NIST AI RMF review topics
  *   - collapsible payload (default closed to keep the timeline scannable)
  */
 export function Timeline({ events, vendorFilter }: Props) {
@@ -68,9 +68,9 @@ function TimelineRow({ event }: { event: GovernanceEvent }) {
       {entry.rmf.length > 0 && (
         <div className="timeline-rmf">
           {entry.rmf.map((c) => (
-            <span key={c.id} className="rmf-chip" title={c.short}>
-              NIST {c.id}
-            </span>
+            <a key={c.id} className="rmf-chip" title={c.short} href={NIST_CORE_URL} target="_blank" rel="noreferrer">
+              NIST review topic: {c.id}
+            </a>
           ))}
         </div>
       )}

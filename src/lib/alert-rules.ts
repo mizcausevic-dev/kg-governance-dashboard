@@ -72,9 +72,9 @@ export const DEFAULT_RULES: AlertRule[] = [
   },
   {
     id: "rule-attestation-tamper",
-    label: "Attestation verification failure (possible tampering)",
+    label: "Attestation verification problem (investigate)",
     shape: "match",
-    kinds: ["^attestation_failed$"],
+    kinds: ["^attestation_(?:failed|tampered)$"],
     sources: [],
     desktop: true,
     severity: "error",
@@ -122,7 +122,17 @@ export function loadRules(): AlertRule[] {
     if (!raw) return DEFAULT_RULES;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return DEFAULT_RULES;
-    return parsed.filter(isRule);
+    return parsed.filter(isRule).map((rule) => {
+      // The original demo-only kind differs from audit-stream-py's wire kind.
+      // Upgrade only an untouched starter rule; preserve user custom rules.
+      if (rule.id === "rule-attestation-tamper" &&
+          rule.label === "Attestation verification failure (possible tampering)" &&
+          rule.kinds.length === 1 && rule.kinds[0] === "^attestation_failed$") {
+        return { ...rule, label: "Attestation verification problem (investigate)",
+          kinds: ["^attestation_(?:failed|tampered)$"] };
+      }
+      return rule;
+    });
   } catch {
     return DEFAULT_RULES;
   }

@@ -14,19 +14,21 @@ describe("EVENT_CATALOG", () => {
     }
   });
 
-  it("every entry has at least one RMF citation except the fallback", () => {
+  it("keeps unmapped events explicit and uses only reviewed NIST topics", () => {
+    const reviewed = new Set(["MEASURE 2.4", "MEASURE 2.7", "GOVERN 4.3"]);
     for (const [kind, entry] of Object.entries(EVENT_CATALOG)) {
       expect(entry.kind, kind).toBe(kind);
       expect(entry.blurb.length, `${kind} blurb`).toBeGreaterThan(10);
-      expect(entry.rmf.length, `${kind} rmf`).toBeGreaterThan(0);
+      for (const topic of entry.rmf) expect(reviewed.has(topic.id), kind).toBe(true);
     }
+    expect(EVENT_CATALOG.decision_card_drafted.rmf).toEqual([]);
   });
 });
 
 describe("lookup", () => {
   it("returns the catalogue entry for a known kind", () => {
-    const entry = lookup("decision_card_drafted");
-    expect(entry.kind).toBe("decision_card_drafted");
+    const entry = lookup("request_denied");
+    expect(entry.kind).toBe("request_denied");
     expect(entry.rmf.length).toBeGreaterThan(0);
   });
 
