@@ -440,6 +440,11 @@ code {
   background: rgba(0, 0, 0, 0.2);
   color: var(--amber-400);
   border-color: rgba(251, 191, 36, 0.3);
+  overflow-wrap: anywhere;
+}
+.demo-banner span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .demo-banner a {
   color: var(--amber-300);
@@ -449,6 +454,11 @@ code {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+}
+.stream-error-banner {
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
+  border-bottom-color: rgba(248, 113, 113, 0.3);
 }
 
 /* main scroll region ========================================== */

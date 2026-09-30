@@ -68,3 +68,35 @@ commit to undo these repository-only changes.
 Useful next enrichment: code splitting to reduce the initial JS bundle,
 contract tests against a deployed audit-stream instance, external chain
 anchoring, and explicit accessibility checks across representative browsers.
+
+## Technical unblock wave (same date)
+
+- Configured live URLs now require an HTTPS same-origin read gateway; HTTP
+  cross-origin loopback is allowed only when the dashboard itself runs on
+  loopback. A rejected non-placeholder URL shows **CONFIG ERROR** with zero
+  events and no demo producer catalog or synthetic log label. HTTP failures
+  from a configured gateway show a visible error. Read requests use
+  same-origin credentials and request no caching. These client checks cannot
+  authenticate or redact the upstream stream.
+- The manual deploy workflow is explicitly a synthetic-demo path. It checks
+  built `dist/config.js` and the public site's current `/config.js` before FTP
+  and refuses to overwrite a site configured for a live feed. The built and
+  current public config each passed that preflight locally. The CI and deploy
+  checkout/setup actions and FTPS action are pinned to immutable SHAs, and
+  checkout credentials are not persisted. The workflow has
+  **not** run; the prior FTPS `530 Login incorrect` remains unresolved.
+- Executed `npm run lint` (exit 0), `npm run typecheck` (exit 0), `npm test`
+  (exit 0: 33 Vitest plus 2 Node tests), `npm run build` (exit 0: 731.03 kB
+  JavaScript, 221.89 kB gzip, with the >500 kB chunk warning),
+  `npm audit --audit-level=high` (exit 0, zero vulnerabilities), and
+  `actionlint -color=false` (exit 0). Headless Chrome via CDP at 390 and
+  1440 CSS pixels showed no document/root horizontal overflow and all four
+  navigation labels in demo and invalid modes, with expected status and zero
+  console errors. A same-origin `/audit-stream` config showed an error banner,
+  zero events, and no overflow; the local Vite server returned expected 404s
+  because no gateway was installed, so that was not a live-stream pass.
+- Production connection remains blocked until an authenticated, authorized,
+  redacted same-origin read gateway is built and verified against a permitted
+  audit stream. The app source of `audit-stream-py` exposes read endpoints
+  without authentication; no gateway, real event authorization, client-data
+  handling, external chain checkpoint, or production rollback was verified.

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isLive, verifyChain } from "../lib/audit-stream";
+import { getAuditStreamMode, verifyChain } from "../lib/audit-stream";
 import type { ChainVerifyResult } from "../lib/types";
 
 type State =
@@ -17,7 +17,8 @@ type State =
  * In demo mode the button is disabled with an explainer.
  */
 export function ChainVerify() {
-  const live = isLive();
+  const mode = getAuditStreamMode();
+  const live = mode === "live";
   const [state, setState] = useState<State>({ kind: "idle" });
 
   async function run() {
@@ -56,8 +57,9 @@ export function ChainVerify() {
 
       {!live && (
         <div className="chain-verify-demo">
-          Disabled in demo mode. Configure <code>AUDIT_STREAM_URL</code> in{" "}
-          <code>/config.js</code> to point this dashboard at your audit-stream-py instance.
+          {mode === "invalid" ? "Disabled: the configured stream URL is invalid." :
+            <>Disabled in demo mode. Configure <code>AUDIT_STREAM_URL</code> in{" "}
+            <code>/config.js</code> to use an authenticated same-origin gateway.</>}
         </div>
       )}
 

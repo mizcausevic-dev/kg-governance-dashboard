@@ -6,7 +6,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import type { ConnectionState } from "../lib/audit-stream";
+import type { ConnectionState, StreamMode } from "../lib/audit-stream";
 
 export type TabId = "overview" | "producers" | "trail" | "verify";
 
@@ -27,7 +27,7 @@ interface Props {
   active: TabId;
   onSelect: (tab: TabId) => void;
   /** Whether the live SSE connection is healthy — drives the heartbeat dot. */
-  live: boolean;
+  mode: StreamMode;
   conn: ConnectionState;
   /** Total events held in memory — shown in the heartbeat panel. */
   eventCount: number;
@@ -38,7 +38,8 @@ interface Props {
  * switcher + a heartbeat panel pinned to the bottom showing whether
  * the dashboard is talking to a live audit-stream.
  */
-export function Sidebar({ active, onSelect, live, conn, eventCount }: Props) {
+export function Sidebar({ active, onSelect, mode, conn, eventCount }: Props) {
+  const live = mode === "live";
   const connected = live && conn === "open";
   return (
     <aside className="sidebar">
@@ -74,14 +75,14 @@ export function Sidebar({ active, onSelect, live, conn, eventCount }: Props) {
         <div className="heartbeat-head">
           <span className="heartbeat-label">Heartbeat</span>
           <span
-            className={`heartbeat-dot ${!live ? "heartbeat-dot-demo" : connected ? "heartbeat-dot-up" : "heartbeat-dot-down"}`}
+            className={`heartbeat-dot ${mode === "demo" ? "heartbeat-dot-demo" : connected ? "heartbeat-dot-up" : "heartbeat-dot-down"}`}
             aria-hidden="true"
           />
         </div>
         <div className="heartbeat-row">
           <span>state</span>
           <span className="heartbeat-val">
-            {!live ? "demo" : connected ? "live" : conn}
+            {mode === "invalid" ? "config error" : !live ? "demo" : connected ? "live" : conn}
           </span>
         </div>
         <div className="heartbeat-row">

@@ -2,12 +2,13 @@ import { useMemo } from "react";
 import { motion } from "motion/react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { lookup } from "../lib/rmf-citations";
+import type { StreamMode } from "../lib/audit-stream";
 import { PRODUCERS } from "../lib/types";
 import type { GovernanceEvent, Producer } from "../lib/types";
 
 interface Props {
   events: readonly GovernanceEvent[];
-  live: boolean;
+  mode: StreamMode;
 }
 
 const SEVERITY_FILL: Record<string, string> = {
@@ -21,9 +22,9 @@ const SEVERITY_FILL: Record<string, string> = {
  * Producers tab — one large card per producer, with full per-kind
  * breakdown (mini bar chart) + last-seen event preview.
  */
-export function ProducersTab({ events, live }: Props) {
+export function ProducersTab({ events, mode }: Props) {
   const producers = useMemo(() => {
-    if (!live) return PRODUCERS;
+    if (mode === "demo") return PRODUCERS;
     const bySource = new Map<string, Set<string>>();
     for (const event of events) {
       if (!bySource.has(event.source)) bySource.set(event.source, new Set());
@@ -36,10 +37,12 @@ export function ProducersTab({ events, live }: Props) {
       shape: "Observed stream source",
       kinds: [...kinds].sort(),
     }));
-  }, [events, live]);
+  }, [events, mode]);
 
   if (producers.length === 0) {
-    return <div className="timeline-empty">Waiting for events from the configured stream.</div>;
+    return <div className="timeline-empty">{mode === "invalid" ?
+      "No producer data: the stream configuration is invalid." :
+      "Waiting for events from the configured stream."}</div>;
   }
   return (
     <div className="producers-tab">

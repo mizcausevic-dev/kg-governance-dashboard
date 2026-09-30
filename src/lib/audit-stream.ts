@@ -12,12 +12,13 @@
  * via `/public/config.js`. That lets operators repoint the deployed
  * dashboard at a different audit-stream instance without rebuilding.
  *
- * When the URL is unset / placeholder, callers should switch to demo
- * mode (see `./demo-events.ts`).
+ * Only an unset / placeholder URL enables demo mode. A rejected URL must
+ * remain visibly invalid rather than silently showing synthetic evidence.
  */
 import type { ChainVerifyResult, GovernanceEvent } from "./types";
 
 const CONFIG_PLACEHOLDER = "__AUDIT_STREAM_URL__";
+export type StreamMode = "demo" | "live" | "invalid";
 
 // audit-stream-py emits named SSE frames (`event: <kind>`) from this wire
 // vocabulary. A new upstream kind needs to be added here to appear live;
@@ -34,24 +35,44 @@ const SSE_EVENT_KINDS = [
   "tool_invocation_required_approval", "other",
 ] as const;
 
-export function getAuditStreamUrl(): string | null {
+function resolveConfig(): { mode: StreamMode; url: string | null } {
   const cfg = window.__KG_GOVERNANCE_CONFIG__;
-  if (!cfg) return null;
-  const raw = (cfg.AUDIT_STREAM_URL ?? "").trim();
-  if (!raw || raw === CONFIG_PLACEHOLDER) return null;
+  if (!cfg || cfg.AUDIT_STREAM_URL === undefined || cfg.AUDIT_STREAM_URL === "") {
+    return { mode: "demo", url: null };
+  }
+  if (typeof cfg.AUDIT_STREAM_URL !== "string") return { mode: "invalid", url: null };
+  const raw = cfg.AUDIT_STREAM_URL.trim();
+  if (!raw || raw === CONFIG_PLACEHOLDER) return { mode: "demo", url: null };
   try {
-    const url = new URL(raw);
-    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-    if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
-        url.username || url.password || url.search || url.hash) return null;
-    return url.href.replace(/\/+$/, "");
+    // Root-relative paths are allowed for a same-origin authenticated gateway.
+    // Bare relative paths can depend on the page route and are rejected.
+    if (!raw.startsWith("/") && !/^https?:\/\//i.test(raw)) {
+      return { mode: "invalid", url: null };
+    }
+    const url = new URL(raw, window.location.origin);
+    const pageLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+    const targetLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    const devLoopback = pageLoopback && targetLoopback && url.protocol === "http:";
+    if ((!devLoopback && (url.protocol !== "https:" || url.origin !== window.location.origin)) ||
+        url.username || url.password || url.search || url.hash) {
+      return { mode: "invalid", url: null };
+    }
+    return { mode: "live", url: url.href.replace(/\/+$/, "") };
   } catch {
-    return null;
+    return { mode: "invalid", url: null };
   }
 }
 
+export function getAuditStreamMode(): StreamMode {
+  return resolveConfig().mode;
+}
+
+export function getAuditStreamUrl(): string | null {
+  return resolveConfig().url;
+}
+
 export function isLive(): boolean {
-  return getAuditStreamUrl() !== null;
+  return getAuditStreamMode() === "live";
 }
 
 function isGovernanceEvent(value: unknown): value is GovernanceEvent {
@@ -69,9 +90,14 @@ async function getJson(url: string): Promise<unknown> {
   try {
     const response = await fetch(url, {
       headers: { accept: "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`GET failed: HTTP ${response.status}`);
+    if (!response.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+      throw new Error("Read gateway returned a non-JSON response");
+    }
     return await response.json();
   } finally {
     clearTimeout(timeout);

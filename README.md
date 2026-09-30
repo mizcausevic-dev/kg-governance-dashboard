@@ -47,13 +47,16 @@ conformance findings or proof that a control operates.
 ## Architecture
 
 ```
-audit-stream-py     --SSE-->     kg-governance-dashboard
-   /events/stream                  React 19 SPA
-                                   (deployed as static HTML/JS to a CDN)
+audit-stream-py  <-- private read path --  authenticated, redacted gateway
+                                            | same-origin /audit-stream/*
+                                            v
+                                  kg-governance-dashboard
+                                  React 19 static SPA
 ```
 
-Pure SPA with no dashboard backend. When configured, it uses three runtime
-read surfaces from the selected audit-stream instance:
+Pure SPA with no dashboard backend. A connected deployment needs a same-origin
+gateway that authorizes each viewer and redacts data before returning these
+three read surfaces:
 
 - `GET {AUDIT_STREAM_URL}/events?limit=50` — initial backfill on cold load.
 - `GET {AUDIT_STREAM_URL}/stream` — long-lived SSE for the live tail.
@@ -82,23 +85,29 @@ rebuilding:
 ```js
 // public/config.js
 window.__KG_GOVERNANCE_CONFIG__ = {
-  AUDIT_STREAM_URL: "https://audit-stream.your-domain.com",
+  AUDIT_STREAM_URL: "/audit-stream",
 };
 ```
 
-Leave `AUDIT_STREAM_URL` as the placeholder `__AUDIT_STREAM_URL__` to
-stay in demo mode. The URL must use HTTPS; plain HTTP is accepted only for
-loopback development. Userinfo, query parameters, and fragments are rejected.
-Invalid values also fall back to demo mode, so check the on-page mode label
-after changing the config.
+Leave `AUDIT_STREAM_URL` as the placeholder `__AUDIT_STREAM_URL__` to stay
+in synthetic demo mode. A configured value must be a root-relative path or an
+absolute same-origin HTTPS URL. Cross-origin HTTP loopback is accepted only
+when the dashboard itself runs on loopback for local development. Userinfo,
+query parameters, fragments, and bare relative paths are rejected. A rejected
+configured value shows **CONFIG ERROR** with no synthetic events; it cannot
+silently appear to be a healthy demo or live feed.
 
-CORS: your `audit-stream-py` instance must allow the dashboard's
-origin. A live public dashboard must receive only events and payload fields
-approved for public disclosure. Do not point this public SPA at an internal,
-privileged, or client-data stream: browser users can inspect every response
-and expanded payload. CORS is not authorization. Define backend authentication,
-redaction, retention, and an independent chain checkpoint before calling a
-connected deployment procurement-ready. Alert rules and up to 100 recent hit
+The gateway must protect `GET /events`, `GET /stream`, and `GET /verify` with
+viewer authentication and authorization; enforce read-only routing (do not
+expose upstream `POST /events`); redact or omit client, matter, privileged,
+secret, and personal data before it reaches the browser; prevent sensitive
+response caching; and define retention, rate limits, and timeouts. A browser
+cannot keep an API secret. Same-origin requests can use a securely configured
+session cookie; the SPA does not provide authentication. The upstream
+`audit-stream-py` app does not itself authenticate its read endpoints in the
+reviewed source. A gateway and its behavior have not been built or verified
+here. CORS alone is not authorization. A separate chain checkpoint is still
+needed for independent tamper evidence. Alert rules and up to 100 recent hit
 summaries are stored in each browser's `localStorage`; users can clear hits in
 the Signals drawer. No analytics are configured in this repo, and fonts are
 served locally.
@@ -142,9 +151,13 @@ The repo ships with two GitHub Actions workflows:
 
 - `.github/workflows/ci.yml` — runs lint, typecheck, tests, build, and
   dependency audit on every push/PR, matrix on Node 22 + 24.
-- `.github/workflows/deploy.yml` — manual dispatch from `main` only. It runs
+- `.github/workflows/deploy.yml` — manual dispatch from `main` only for the
+  synthetic demo. It runs
   lint, typecheck, tests, a production dependency audit, and a build before
-  attempting FTPS-sync of `dist/` to `/governance/`. Configure repo secrets
+  attempting FTPS-sync of `dist/` to `/governance/`. Before FTP, it rejects
+  a built non-demo config and refuses to overwrite a public site whose
+  `/config.js` is not still the demo placeholder. A live deployment needs a
+  separately reviewed path and gateway. Configure repo secrets
   `FTP_HOST`, `FTP_USER`, `FTP_PASS`, verify account access and path, and check
   the actual workflow and public site after any release. The observed main
   deploy run on 2026-08-05 failed with `530 Login incorrect` on both attempts;
